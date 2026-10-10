@@ -4,7 +4,7 @@ AI agents that turn **synthetic football events** into **explainable match intel
 
 Built for the **Microsoft Premier League Hackathon**.
 
-- **Live demo:** LIVE_URL
+- **Live demo:** [LIVE_URL](https://matchlens-api.salmondune-d51fb9da.eastus2.azurecontainerapps.io)
 - **Repository:** https://github.com/bientechsavvy/matchlens
 - **Data:** 100% synthetic. No real match footage or Premier League data is used.
 
