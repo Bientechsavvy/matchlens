@@ -35,3 +35,16 @@ def test_agent_run_endpoint():
     mid = c.post("/matches", json={"seed": 42}).json()["match_id"]
     r = c.get(f"/matches/{mid}/agent-run", params={"mode": "analyst"}).json()
     assert r["agents"] == ORDER and r["trace"] and r["overlays"]
+
+def test_agents_accept_unshareable_llm_client():
+    import threading
+
+    class Holder:  # like a real HTTP client: it cannot be copied or pickled
+        def __init__(self):
+            self.lock = threading.Lock()
+
+        def complete(self, system, prompt):
+            return "AI text"
+
+    job = asyncio.run(run_agents(ViewerProfile(mode="analyst"), seed=7, llm=Holder()))
+    assert any(o.payload.get("source") == "llm" for o in job.overlays if o.kind == "lower_third")    

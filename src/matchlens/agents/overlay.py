@@ -13,7 +13,7 @@ def moment_overlays(match: Match, expl: list[Explanation], profile: ViewerProfil
                     start_index: int = 0) -> list[Overlay]:
     out = []
     for i, ex in enumerate(expl, start=start_index):
-        n = narrator.narrate(ex, profile.lang)
+        n = narrator.narrate(ex, profile.lang, enrich=profile.mode == "analyst")
         body = n.detailed if profile.mode == "analyst" else n.short
         out.append(Overlay(
             overlay_id=f"ov_{i:04d}", match_id=match.match_id, kind="lower_third", t_start_s=ex.clock_s,

@@ -4,6 +4,7 @@ Six executors, each a specialised agent with one role, hand a shared Job along a
 simulator -> analyst -> explainer -> personalizer -> narrator -> overlay_renderer
 Every agent runs under the Supervisor (retry, fallback, trace).
 """
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -20,12 +21,17 @@ from matchlens.schemas.events import Match, ViewerProfile
 from matchlens.simulator.generator import MatchSimulator
 
 
+# The Agent Framework copies every message passed between agents. Objects such as an HTTP/LLM
+# client cannot be copied, so the Job carries only a run_id and the client lives in this registry.
+_LLM_REGISTRY: dict[str, Any] = {}
+
+
 @dataclass
 class Job:
     profile: ViewerProfile
     match: Optional[Match] = None
     seed: int = 42
-    llm: Any = None
+    run_id: str = ""
     sv: Supervisor = field(default_factory=Supervisor)
     stats: Any = None
     momentum: list = field(default_factory=list)
@@ -71,7 +77,7 @@ async def personalizer(job: Job, ctx: WorkflowContext[Job]) -> None:
 async def narrator(job: Job, ctx: WorkflowContext[Job]) -> None:
     job.overlays = job.sv.run(
         "narrator",
-        lambda: moment_overlays(job.match, job.chosen, job.profile, Narrator(job.llm)),
+        lambda: moment_overlays(job.match, job.chosen, job.profile, Narrator(_LLM_REGISTRY.get(job.run_id))),
         fallback=lambda: moment_overlays(job.match, job.chosen, job.profile, Narrator()))
     job.handoffs.append("narrator")
     await ctx.send_message(job)
@@ -96,5 +102,10 @@ def build_workflow():
 
 async def run_agents(profile: ViewerProfile, match: Optional[Match] = None, seed: int = 42,
                      llm: Any = None) -> Job:
-    result = await build_workflow().run(Job(profile=profile, match=match, seed=seed, llm=llm))
+    run_id = uuid.uuid4().hex
+    _LLM_REGISTRY[run_id] = llm
+    try:
+        result = await build_workflow().run(Job(profile=profile, match=match, seed=seed, run_id=run_id))
+    finally:
+        _LLM_REGISTRY.pop(run_id, None)
     return result.get_outputs()[0]

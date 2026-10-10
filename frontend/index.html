@@ -1,61 +1,236 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>MatchLens: live match intelligence</title>
 <style>
+/* ===== Design tokens ===== */
 :root{--bg:#0d1f1a;--panel:#142a23;--line:#27463b;--ink:#e9f0ec;--mute:#8fa89d;--home:#ffd23f;--away:#5ec8e5;--r:6px}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif}
+
+/* ===== Base and layout ===== */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif}
 main{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:24px;max-width:1040px;margin:0 auto;padding:24px}
 @media(max-width:720px){main{grid-template-columns:1fr}}
-h1{font:700 1.6rem/1.2 Georgia,serif;margin:0 0 4px}p.sub{margin:0 0 20px;color:var(--mute)}
+h1{font:700 1.6rem/1.2 Georgia,serif;margin:0 0 4px}
+h2{font-size:1rem;margin:0 0 8px}
+.sub{margin:0 0 20px;color:var(--mute)}
+
+/* ===== Control panel ===== */
 aside{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;align-self:start}
 label{display:block;margin:12px 0 4px;color:var(--mute);font-size:.9rem}
 select,input,button{width:100%;padding:8px;border-radius:var(--r);border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 button{background:var(--home);color:#241c00;font-weight:700;border:0;margin-top:16px;cursor:pointer}
+button.secondary{background:var(--away);margin-top:8px}
+button:disabled{opacity:.6;cursor:not-allowed}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--away);outline-offset:2px}
-.score{font:700 2.4rem/1 Georgia,serif;margin:0}.clock{color:var(--mute);margin:4px 0 16px;font-variant-numeric:tabular-nums}
+
+/* ===== Match header and momentum graph ===== */
+.score{font:700 2.4rem/1 Georgia,serif;margin:0}
+.clock{color:var(--mute);margin:4px 0 16px;font-variant-numeric:tabular-nums}
+#mom{display:none;width:100%;height:90px;margin:0 0 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+
+/* ===== Overlay feed (broadcast-style lower thirds) ===== */
 #feed{display:flex;flex-direction:column;gap:10px}
 .ov{border-left:6px solid var(--home);background:var(--panel);padding:10px 14px;border-radius:0 var(--r) var(--r) 0;animation:in .35s ease-out}
-.ov.away{border-color:var(--away)}.ov h3{margin:0;font-size:1.1rem}.ov p{margin:2px 0 0;color:var(--mute)}.ov small{color:var(--mute)}
-.stat{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;font-variant-numeric:tabular-nums}.stat span:nth-child(2){color:var(--mute);text-align:center}.stat span:last-child{text-align:right}
-#recap{margin-top:16px;padding:12px;border:1px dashed var(--line);border-radius:var(--r);display:none}
+.ov.away{border-color:var(--away)}
+.ov h3{margin:0;font-size:1.1rem}
+.ov p{margin:2px 0 0;color:var(--mute)}
+.ov small{color:var(--mute)}
 @keyframes in{from{opacity:0;transform:translateX(-14px)}}
 @media(prefers-reduced-motion:reduce){.ov{animation:none}}
-#mom{width:100%;height:90px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 16px;display:none}
-</style></head><body><main>
-<aside><h1>MatchLens</h1><p class="sub">Synthetic match, explained as it happens.</p>
-<label for="mode">Viewer</label><select id="mode"><option value="casual">Casual fan</option><option value="analyst">Analyst</option></select>
-<label for="lang">Language</label><select id="lang"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option></select>
-<label for="fav">Favourite team</label><select id="fav"><option value="">None</option><option value="home">Home</option><option value="away">Away</option></select>
-<label for="focus">Player focus (id, e.g. home_9)</label><input id="focus" placeholder="home_9"><input id="seed" type="number" value="42">
-<label for="speed">Speed (x real time)</label><input id="speed" type="number" value="120" min="1">
-<button id="go">Kick off</button></aside>
-<section><p class="score" id="score">Press Kick off</p><p class="clock" id="clock" aria-live="polite"></p>
-<svg id="mom" viewBox="0 0 540 90" preserveAspectRatio="none" role="img" aria-label="Match momentum"></svg><div id="feed" aria-live="polite"></div><div id="recap"></div><div id="stats"></div></section></main>
+
+/* ===== Recap, stats table and agent panel ===== */
+#recap{display:none;margin-top:16px;padding:12px;border:1px dashed var(--line);border-radius:var(--r)}
+#stats,#agents{margin-top:16px}
+.stat{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;font-variant-numeric:tabular-nums}
+.stat span:nth-child(2){color:var(--mute);text-align:center}
+.stat span:last-child{text-align:right}
+.hop{display:flex;justify-content:space-between;margin-bottom:4px;padding:6px 10px;background:var(--panel);border-left:4px solid var(--away);border-radius:0 var(--r) var(--r) 0;font-variant-numeric:tabular-nums}
+.hop span{color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+  <!-- Viewer controls -->
+  <aside aria-label="Match controls">
+    <h1>MatchLens</h1>
+    <p class="sub">Synthetic match, explained as it happens.</p>
+
+    <label for="mode">Viewer</label>
+    <select id="mode"><option value="casual">Casual fan</option><option value="analyst">Analyst</option></select>
+
+    <label for="lang">Language</label>
+    <select id="lang"><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option></select>
+
+    <label for="fav">Favourite team</label>
+    <select id="fav"><option value="">None</option><option value="home">Home</option><option value="away">Away</option></select>
+
+    <label for="focus">Player focus (optional, e.g. home_9)</label>
+    <input id="focus" placeholder="home_9">
+
+    <label for="seed">Match seed</label>
+    <input id="seed" type="number" value="42">
+
+    <label for="speed">Speed (x real time)</label>
+    <input id="speed" type="number" value="120" min="1">
+
+    <button id="go" type="button">Kick off</button>
+    <button id="agentbtn" class="secondary" type="button">Show agent run</button>
+  </aside>
+
+  <!-- Live match output -->
+  <section aria-label="Live match">
+    <p class="score" id="score">Press Kick off</p>
+    <p class="clock" id="clock" aria-live="polite"></p>
+    <svg id="mom" viewBox="0 0 540 90" preserveAspectRatio="none" role="img" aria-label="Match momentum"></svg>
+    <div id="feed" aria-live="polite"></div>
+    <div id="recap"></div>
+    <div id="stats"></div>
+    <div id="agents"></div>
+  </section>
+</main>
+
 <script>
-const $=id=>document.getElementById(id);let ws,mid;
-const mmss=s=>Math.floor(s/60)+"'";
-function card(o){const d=document.createElement("div");d.className="ov "+(o.payload.team||"");
- if(o.kind==="stat_card"){d.innerHTML="<h3></h3>"+o.payload.rows.map(r=>`<div class="stat"><span>${r.home}</span><span>${r.label}</span><span>${r.away}</span></div>`).join("");d.querySelector("h3").textContent=o.payload.title}
- else{d.innerHTML="<h3></h3><p></p><small></small>";d.querySelector("h3").textContent=o.payload.headline;d.querySelector("p").textContent=o.payload.body||"";d.querySelector("small").textContent=o.payload.source==="llm"&&o.payload.body?"AI commentary":""}
- $("feed").prepend(d)}
-$("go").onclick=async()=>{ws&&ws.close();$("feed").innerHTML="";$("stats").innerHTML="";$("recap").style.display="none";
- const r=await fetch("/matches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({seed:+$("seed").value})});
- if(!r.ok){$("score").textContent="Could not create match";return}
- const m=await r.json();mid=m.match_id;$("score").textContent="Kick off";$("clock").textContent="0'";drawMomentum();
- const q=new URLSearchParams({mode:$("mode").value,lang:$("lang").value,favourite_team:$("fav").value,focus_player:$("focus").value.trim(),speed:$("speed").value});
- ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+`/matches/${mid}/stream?`+q);
- ws.onmessage=async e=>{const f=JSON.parse(e.data);
-  if(f.type==="overlay"){card(f.overlay);$("clock").textContent=mmss(f.overlay.t_start_s)}
-  else if(f.type==="end"){const s=await(await fetch(`/matches/${mid}/recap?mode=${$("mode").value}&lang=${$("lang").value}`)).json();
-   $("score").textContent=`${m.score.home} - ${m.score.away}`;$("clock").textContent="Full time";$("recap").textContent=s.recap;$("recap").style.display="block";showStats()}};
- ws.onerror=()=>{$("clock").textContent="Connection lost. Press Kick off to retry."}};
- async function drawMomentum(){const d=await(await fetch(`/matches/${mid}/stats`)).json();
- const pts=d.momentum.map(([t,v])=>`${(t/5400*540).toFixed(1)},${(45-v*40).toFixed(1)}`).join(" ");
- $("mom").innerHTML=`<line x1="0" y1="45" x2="540" y2="45" stroke="#27463b"/><polyline points="${pts}" fill="none" stroke="#ffd23f" stroke-width="2"/>`;$("mom").style.display="block"}
-async function showStats(){const s=(await(await fetch(`/matches/${mid}/stats`)).json()).stats;
- const rows=[["Possession %","possession_pct"],["Passes","passes"],["Pass accuracy %","pass_accuracy_pct"],["Shots","shots"],["On target","shots_on_target"],["xG","xg"]];
- $("stats").innerHTML=rows.map(([l,k])=>`<div class="stat"><span>${s.home[k]}</span><span>${l}</span><span>${s.away[k]}</span></div>`).join("")}
+(() => {
+  "use strict";
+
+  /* ---------- State and helpers ---------- */
+  const $ = id => document.getElementById(id);
+  let socket = null;   // live overlay stream
+  let matchId = null;  // id returned by POST /matches
+
+  // Build DOM nodes with textContent only, so server text is never parsed as HTML.
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  const statRow = (label, home, away) => {
+    const row = el("div", "stat");
+    row.append(el("span", null, home), el("span", null, label), el("span", null, away));
+    return row;
+  };
+  const minute = seconds => Math.floor(seconds / 60) + "'";
+  const setBusy = busy => { $("go").disabled = busy; };
+
+  async function api(path, options) {
+    const res = await fetch(path, options);
+    if (!res.ok) throw new Error(path + " returned " + res.status);
+    return res.json();
+  }
+
+  /* ---------- Rendering ---------- */
+  function renderOverlay(o) {
+    const p = o.payload;
+    const card = el("div", "ov " + (p.team || ""));
+    if (o.kind === "stat_card") {
+      card.append(el("h3", null, p.title));
+      p.rows.forEach(r => card.append(statRow(r.label, r.home, r.away)));
+    } else {
+      card.append(el("h3", null, p.headline));
+      if (p.body) card.append(el("p", null, p.body));
+      if (p.source === "llm" && p.body) card.append(el("small", null, "AI commentary"));
+    }
+    $("feed").prepend(card);  // newest on top
+  }
+
+  async function drawMomentum() {
+    const d = await api(`/matches/${matchId}/stats`);
+    // Above the centre line = home team on top, below = away team on top.
+    const pts = d.momentum.map(([t, v]) => `${(t / 5400 * 540).toFixed(1)},${(45 - v * 40).toFixed(1)}`).join(" ");
+    $("mom").innerHTML = `<line x1="0" y1="45" x2="540" y2="45" stroke="#27463b"/>` +
+      `<polyline points="${pts}" fill="none" stroke="#ffd23f" stroke-width="2"/>`;
+    $("mom").style.display = "block";
+  }
+
+  async function showStats() {
+    const s = (await api(`/matches/${matchId}/stats`)).stats;
+    const rows = [["Possession %", "possession_pct"], ["Passes", "passes"], ["Pass accuracy %", "pass_accuracy_pct"],
+                  ["Shots", "shots"], ["On target", "shots_on_target"], ["xG", "xg"]];
+    $("stats").replaceChildren(...rows.map(([label, key]) => statRow(label, s.home[key], s.away[key])));
+  }
+
+  async function showAgents() {
+    const box = $("agents");
+    if (!matchId) { box.textContent = "Press Kick off first."; return; }
+    box.textContent = "Running agents...";
+    try {
+      const d = await api(`/matches/${matchId}/agent-run?mode=${$("mode").value}&lang=${$("lang").value}`);
+      const timing = Object.fromEntries(d.trace.map(t => [t.stage, t]));
+      const hops = d.agents.map((name, i) => {
+        const t = timing[name];
+        const hop = el("div", "hop");
+        hop.append(el("b", null, `${i + 1}. ${name}`), el("span", null, t ? `${t.status} - ${t.ms} ms` : "ok"));
+        return hop;
+      });
+      box.replaceChildren(el("h2", null, "Agent workflow"), ...hops, el("p", null, `${d.overlays.length} overlays produced`));
+    } catch (err) {
+      box.textContent = "Agent run failed: " + err.message;
+    }
+  }
+
+  /* ---------- Match flow ---------- */
+  function resetView() {
+    $("feed").replaceChildren();
+    $("stats").replaceChildren();
+    $("agents").replaceChildren();
+    $("recap").style.display = "none";
+  }
+
+  async function onStreamEnd(match) {
+    const recap = await api(`/matches/${matchId}/recap?mode=${$("mode").value}&lang=${$("lang").value}`);
+    $("score").textContent = `${match.score.home} - ${match.score.away}`;
+    $("clock").textContent = "Full time";
+    $("recap").textContent = recap.recap;
+    $("recap").style.display = "block";
+    await showStats();
+  }
+
+  async function kickOff() {
+    if (socket) socket.close();
+    resetView();
+    setBusy(true);
+    try {
+      const match = await api("/matches", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seed: Number($("seed").value) || 42 }),
+      });
+      matchId = match.match_id;
+      $("score").textContent = "Kick off";
+      $("clock").textContent = "0'";
+      await drawMomentum();
+
+      const query = new URLSearchParams({
+        mode: $("mode").value, lang: $("lang").value, favourite_team: $("fav").value,
+        focus_player: $("focus").value.trim(), speed: $("speed").value,
+      });
+      const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+      socket = new WebSocket(`${scheme}${location.host}/matches/${matchId}/stream?${query}`);
+      socket.onmessage = async e => {
+        const frame = JSON.parse(e.data);
+        if (frame.type === "overlay") {
+          renderOverlay(frame.overlay);
+          $("clock").textContent = minute(frame.overlay.t_start_s);
+        } else if (frame.type === "end") {
+          await onStreamEnd(match);
+        }
+      };
+      socket.onclose = () => setBusy(false);
+      socket.onerror = () => { $("clock").textContent = "Connection lost. Press Kick off to retry."; };
+    } catch (err) {
+      $("score").textContent = "Could not start the match";
+      $("clock").textContent = err.message;
+      setBusy(false);
+    }
+  }
+
+  $("go").addEventListener("click", kickOff);
+  $("agentbtn").addEventListener("click", showAgents);
+})();
 </script>
 </body>
 </html>

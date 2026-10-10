@@ -89,3 +89,20 @@ def test_trace_and_index():
     c.get(f"/matches/{mid}/overlays")
     assert c.get(f"/matches/{mid}/trace").json()["trace"]
     assert "MatchLens" in c.get("/").text
+
+
+
+def test_casual_mode_does_not_call_the_llm():
+    calls = []
+
+    class Counter:
+        def complete(self, system, prompt):
+            calls.append(1)
+            return "AI text"
+
+    p = Pipeline(Counter())
+    an = p.analyse(MatchSimulator(42).generate())
+    p.overlays(an, ViewerProfile(mode="casual"))
+    assert calls == []
+    p.overlays(an, ViewerProfile(mode="analyst"))
+    assert calls

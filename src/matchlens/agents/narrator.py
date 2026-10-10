@@ -45,7 +45,7 @@ class Narrator:
     def __init__(self, llm: LLMClient | None = None):
         self.llm = llm or NullClient()
 
-    def narrate(self, ex: Explanation, lang: str = "en") -> Narration:
+    def narrate(self, ex: Explanation, lang: str = "en", enrich: bool = True) -> Narration:
         t, f = T[lang], ex.facts
         ctx = t["ctx_open"] if f.get("opened_scoring") else t["ctx_eq"] if f.get("equalised") else t["ctx_none"]
         d = dict(f, xg=f.get("xg") or 0.0, xg_txt=t["xg"].format(xg=f.get("xg") or 0.0) if f.get("xg") else "",
@@ -54,7 +54,7 @@ class Narrator:
         short = t[ex.category.replace("goal_context", "goal")].format(**d)
         detailed = t[ex.category.replace("goal_context", "goal") + "_d"].format(**d).strip()
         source = "template"
-        enriched = self.llm.complete(
+        enriched = None if not enrich else self.llm.complete(
             f"You are a football commentator. Reply in language '{lang}'. Use ONLY the given facts.",
             f"Facts: {f}\nBase text: {detailed}")
         if enriched:
