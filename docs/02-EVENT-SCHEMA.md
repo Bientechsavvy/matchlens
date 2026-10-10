@@ -51,7 +51,9 @@ Difficulty = 0.15 + distance/60 + 0.5 x pressure + 0.15 if ending in the final t
 }
 ```
 
-Overlay kinds: `lower_third` (moments), `stat_card` (periodic stats), `momentum_bar` (periodic momentum), `recap` (full-time).
+Overlay kinds emitted today: `lower_third` (key moments) and `stat_card` (analyst mode only, at 15', 45' and 90', computed from events up to that time). `momentum_bar` and `recap` exist in the schema but are not emitted; the recap is served as text at `/matches/{id}/recap`.
+
+`payload.source` is `llm` when a Foundry model wrote the body and `template` otherwise. In casual mode `payload.body` is empty and no model call is made.
 
 ## Versioning
 `schema_version: "1.0"` is included in API responses. Breaking changes bump the major version.

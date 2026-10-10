@@ -1,66 +1,66 @@
 # 01. Architecture
 
 ## 1. Goals
-1. Convert raw synthetic football events into explainable insight in near real time.
-2. Output must be **machine-readable** (overlay JSON synced to the match clock) and **human-readable** (narratives, recaps).
-3. Same intelligence, different experiences: analyst vs casual fan, any language, favourite club, player focus.
-4. Deterministic and testable core, with LLMs layered on top (never required for correctness).
+1. Convert synthetic football events into explainable insight.
+2. Output must be machine-readable (overlay JSON synced to the match clock) and human-readable (narratives, recaps).
+3. The same intelligence reaches different viewers: analyst or casual, three languages, favourite team, player focus.
+4. A deterministic, testable core. AI only enriches the text and is never required for correctness.
 
 ## 2. Logical architecture
 
 ```
-            +-------------------+
-            |  Event Simulator  |  seeded, football-realistic
-            +---------+---------+
-                      | MatchEvent stream
-                      v
- +--------------------+--------------------+
- |              Orchestrator               |  Phase 1: pipeline.py
- |   (Microsoft Agent Framework in Phase 2)|  Phase 2: Agent Framework
- +--+---------+----------+---------+-------+
-    |         |          |         |
-    v         v          v         v
- Analyst   Explainer   Narrator  Personalizer --> Overlay Renderer
- (metrics) (why)       (text/i18n) (viewer)       (JSON overlays)
-                                                     |
-                                                     v
-                                   REST API / WebSocket --> React frontend
+Browser (frontend/index.html)
+   |  REST + WebSocket
+   v
+FastAPI (api/main.py) ----------------------------+
+   |                                              |
+   |  live feed                                   |  GET /matches/{id}/agent-run
+   v                                              v
+Pipeline (orchestration/pipeline.py)      Agent Framework workflow
+   |                                      (orchestration/agent_workflow.py)
+   |   Both run the same steps and produce identical overlays:
+   |   simulator -> analyst -> explainer -> personalizer -> narrator -> overlay renderer
+   v
+Narrator --(optional, analyst mode)--> Foundry model (gpt-4.1-mini)
 ```
+
+The live feed uses `Pipeline`. The Agent Framework workflow is a second execution path over the same functions. A test asserts that both produce identical overlays.
 
 ## 3. Design decisions
 
 | Decision | Rationale |
-|----------|-----------|
-| Deterministic core, LLM enrichment | Judges must be able to run the project reliably. If Foundry is unavailable, templates produce valid output. |
-| Structured `facts` between Explainer and Narrator | Narration in any language is rendered from facts. No hallucinated numbers. |
-| Pitch coordinates 0-100 (x along the pitch, y across) | Provider-agnostic, easy to convert to metres (x*1.05, y*0.68). |
-| Seeded simulator | Reproducible demos, tests and video recordings. |
-| Pydantic contracts | Validation at every boundary, auto-generated JSON Schema and OpenAPI. |
-| Pipeline behind one interface (`run`) | Swap in Agent Framework without touching agents. |
-| Overlay = `{t_start_s, duration_s, kind, payload}` | Rendering partner can schedule against the live clock. |
+|---|---|
+| Deterministic core, AI as enrichment | Judges must be able to run the project. If Foundry is unavailable, templates still produce valid output. |
+| Structured `facts` between Explainer and Narrator | Text in any language is rendered from facts. Numbers never come from the model. |
+| Pitch coordinates 0-100 | Provider-agnostic, easy to convert to metres (x*1.05, y*0.68). |
+| Seeded simulator | Reproducible demos and tests. |
+| Pydantic contracts | Validation at every boundary. |
+| Supervisor per stage | Retry, fallback and a trace without changing agent code. |
+| LLM client kept out of Agent Framework messages | The framework copies messages, and HTTP clients cannot be copied. The client lives in a registry keyed by `run_id`. |
+| Personalise before narrate | The model is only called for moments the viewer will see. |
 
-## 4. Coordinate system
-Absolute pitch coordinates: `home` attacks toward `x = 100`, `away` attacks toward `x = 0`. Analytics convert to **team-relative** x (`x` for home, `100 - x` for away) so "final third" is always `rel_x > 66`.
+## 4. Coordinates and clock
+`home` attacks toward `x = 100`, `away` toward `x = 0`. Analytics convert to team-relative x so "final third" is always `rel_x > 66`. `clock_s` runs 0 to 5400 (period 1: 0-2700, period 2: 2700-5400).
 
-## 5. Clock model
-`clock_s` = seconds since kickoff (0-5400). Period 1: 0-2700, period 2: 2700-5400. Overlays reference `clock_s`; a live feed maps its own match clock to this value.
+## 5. Azure mapping
 
-## 6. Azure mapping (target state)
+| Concern | Service | Status |
+|---|---|---|
+| AI commentary | Microsoft Foundry model deployment (`gpt-4.1-mini`) | built |
+| Orchestration | Microsoft Agent Framework workflow | built, served at `/agent-run` |
+| Compute | Azure Container Apps (East US 2) | built |
+| Identity | Managed identity with the Cognitive Services OpenAI User role | built, no keys stored |
+| Image build | GitHub Actions to GitHub Container Registry | built |
+| State | Azure Cosmos DB | planned. Today state is in memory |
+| Event streaming | Azure Event Hubs | planned |
+| Observability | Application Insights | planned. Today: the Container Apps log stream |
 
-| Concern | Service |
-|---------|---------|
-| LLM + agent management | Microsoft Foundry |
-| Orchestration | Microsoft Agent Framework (A2A handoffs) |
-| Event streaming | Azure Event Hubs |
-| Compute | Azure Container Apps (API), Azure Functions (stream processors) |
-| State | Azure Cosmos DB (match state, overlays) |
-| Observability | Application Insights / OpenTelemetry |
-| Secrets | Azure Key Vault + managed identity |
+## 6. Failure handling
+- Every stage runs under the Supervisor: up to 2 retries, then a template fallback where one exists, and a trace entry.
+- Any Foundry error (permissions, timeout, wrong deployment) returns no text, so the template is used. The failure is logged as `Foundry call failed`.
+- Invalid events sent to `POST /events` are rejected with 422 and never change state.
 
-## 7. Failure handling
-- Each agent call is wrapped with timeout + retry (max 2) and a deterministic fallback.
-- LLM failure results in template narration (`source: "template"` flag in payload).
-- Invalid events are rejected at ingest and counted in metrics. They never crash the pipeline.
-
-## 8. Non-goals
-Real broadcast video processing, real provider data, betting or odds features.
+## 7. Limits
+- In-memory state means one replica, and matches are lost on restart.
+- No authentication on the public API.
+- Non-goals: real video processing, real provider data, betting features.

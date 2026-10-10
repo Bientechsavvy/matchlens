@@ -1,12 +1,27 @@
 # 07. Roadmap
 
-| Week | Dates | Deliverables | Status |
-|------|-------|--------------|--------|
-| 0 | by Oct 6 | docs and scaffold | done |
-| 1 | Oct 6-13 | schema, simulator, analyst, explainer, narrator, personaliser, overlays, API, tests | done (Phase 1) |
-| 2 | Oct 13-20 | Foundry LLM narration (done), supervised workflow with retry/fallback/trace (done), WebSocket stream and event ingest (done), single-page frontend (done), Dockerfile, CI, Bicep starter (done). Remaining: Microsoft Agent Framework adapter, Event Hubs, Cosmos DB | partial |
-| 3 | Oct 20-27 | Container Apps deploy, README polish, < 2 min video, pitch, submit by Oct 25 | todo |
+| Area | Status |
+|---|---|
+| Schema, simulator, analyst, explainer, narrator (EN/ES/FR), personalizer, overlays, API | done |
+| Supervisor with retry, fallback and trace | done |
+| Foundry commentary, verified live | done |
+| Microsoft Agent Framework workflow (`/agent-run`) | done |
+| WebSocket stream, event ingest | done |
+| Frontend with momentum graph, stats and agent panel | done |
+| GitHub repository and image publishing workflow | done |
+| Azure Container Apps deployment with managed identity | done |
+| 30 offline tests, lint clean | done |
+| README and docs updated | done |
+| Demo video (under 2 minutes) and pitch | to do |
+| Submit on the hackathon site (deadline 27 Oct 2026, 11:59 pm Pacific) | to do |
+
+## Optional improvements, in order of value
+1. Run the narrator's model calls in parallel, so analyst mode takes about 1 to 2 seconds instead of several.
+2. Store matches in Cosmos DB, which removes the single-replica limit and strengthens the Azure story.
+3. Make `agent-run` honour favourite team and player focus.
+4. Add Application Insights for monitoring.
+5. Add Event Hubs for streaming ingest.
 
 ## Risks
-- Foundry or Agent Framework learning curve: mitigated by the deterministic fallback.
-- Frontend time: keep to one screen (pitch timeline, overlay feed, mode switcher).
+- The public API has no authentication and each match can call the model. Keep a cost budget in place.
+- State is lost on restart, so run through the demo shortly after any redeploy.

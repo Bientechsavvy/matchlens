@@ -1,3 +1,3 @@
-# Infra (Phase 2)
+# Infra
 
-Bicep templates: Container Apps, Event Hubs, Cosmos DB, Key Vault, Application Insights, Foundry project.
+`main.bicep` is an unvalidated starter for a Container App. The live deployment was created with the Azure CLI commands in docs/05-DEPLOYMENT.md, not with this file.
