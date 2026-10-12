@@ -73,6 +73,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 
     <label for="seed">Match seed</label>
     <input id="seed" type="number" value="42">
+    <button id="randombtn" class="secondary" type="button">Random match</button>
 
     <label for="speed">Speed (x real time)</label>
     <input id="speed" type="number" value="120" min="1">
@@ -228,7 +229,11 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
     }
   }
 
-  $("go").addEventListener("click", kickOff);
+    $("go").addEventListener("click", kickOff);
+  $("randombtn").addEventListener("click", () => {
+    $("seed").value = Math.floor(Math.random() * 9000) + 1;  // any seed gives a different match
+    kickOff();
+  });
   $("agentbtn").addEventListener("click", showAgents);
 })();
 </script>

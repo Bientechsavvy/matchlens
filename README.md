@@ -38,6 +38,9 @@ Use Python 3.12 from python.org. The MSYS2 Python cannot install the dependencie
 ```powershell
 py -3.12 -m venv .venv312
 .venv312\Scripts\Activate.ps1
+
+
+
 pip install -e ".[dev,azure,agents]"
 python -m pytest
 python -m uvicorn matchlens.api.main:app --reload
