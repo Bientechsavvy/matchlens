@@ -38,6 +38,10 @@ Use Python 3.12 from python.org. The MSYS2 Python cannot install the dependencie
 ```powershell
 py -3.12 -m venv .venv312
 .venv312\Scripts\Activate.ps1
+$fqdn = az containerapp show --name matchlens-api --resource-group matchlens-rg --query properties.configuration.ingress.fqdn -o tsv
+"https://$fqdn"
+Invoke-RestMethod "https://$fqdn/health"
+Start-Process "https://$fqdn"
 pip install -e ".[dev,azure,agents]"
 python -m pytest
 python -m uvicorn matchlens.api.main:app --reload
